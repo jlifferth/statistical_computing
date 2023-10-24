@@ -1,0 +1,193 @@
+---
+author: 'Jonathan Lifferth'
+title: 'Bios 6301: Assignment 6'
+output: pdf_document
+params:
+  year: 2023
+---
+
+*Due Tuesday, 24 October, 1:00 PM*
+
+$5^{n=day}$ points taken off for each day late.
+
+40 points total.
+
+Submit a single knitr file (named `homework6.rmd`), along with a valid PDF output file. Inside the file, clearly indicate which parts of your responses go with which problems (you may use the original homework document as a template). Add your name as `author` to the file's metadata section. Raw R code/output or word processor files are not acceptable.
+
+Failure to name file `homework6.rmd` or include author name may result in 5 points taken off.
+
+### Question 1 ###
+
+**16 points**
+
+Obtain a copy of the [football-values lecture](https://github.com/couthcommander/football-values).  Save the five 2023 CSV files in your working directory.
+
+Modify the code to create a function.  This function will create dollar values given information (as arguments) about a league setup.  It will return a data.frame and write this data.frame to a CSV file.  The final data.frame should contain the columns 'PlayerName', 'pos', 'points', 'value' and be ordered by value descendingly.  Do not round dollar values.
+
+Note that the returned data.frame should have `sum(posReq)*nTeams` rows.
+
+Define the function as such (10 points):
+
+```{r eval=FALSE}
+# path: directory path to input files
+path <- '~/R_projects/statistical_computing'
+# file: name of the output file; it should be written to path
+# nTeams: number of teams in league
+# cap: money available to each team
+# posReq: number of starters for each position
+# points: point allocation for each category
+ffvalues <- function(path, file='outfile.csv', nTeams=12, cap=200, posReq=c(qb=1, rb=2, wr=3, te=1, k=1),
+                     points=c(fg=4, xpt=1, pass_yds=1/25, pass_tds=4, pass_ints=-2,
+                              rush_yds=1/10, rush_tds=6, fumbles=-2, rec_yds=1/20, rec_tds=6)) {
+  ## read in CSV files
+  year <- params$year
+  positions <- c('k','qb','rb','te','wr')
+  csvfile <- paste('proj_', positions, substr(year, 3, 4), '.csv', sep='')
+  files <- file.path(year, csvfile)
+  names(files) <- positions
+  k <- read.csv(files['k'], header=TRUE, stringsAsFactors=FALSE)
+  qb <- read.csv(files['qb'], stringsAsFactors=FALSE)
+  rb <- read.csv(files['rb'])
+  te <- read.csv(files['te'])
+  wr <- read.csv(files['wr'])
+  
+  # generate unique list of column names
+  cols <- unique(c(names(k), names(qb), names(rb), names(te), names(wr)))
+  
+  # create a new column in each data.frame
+  k[,'pos'] <- 'k'
+  qb[,'pos'] <- 'qb'
+  rb[,'pos'] <- 'rb'
+  te[,'pos'] <- 'te'
+  wr[,'pos'] <- 'wr'
+  
+  # append 'pos' to unique column list
+  cols <- c(cols, 'pos')
+  
+  # create common columns in each data.frame
+  # initialize values to zero
+  k[,setdiff(cols, names(k))] <- 0
+  qb[,setdiff(cols, names(qb))] <- 0
+  rb[,setdiff(cols, names(rb))] <- 0
+  te[,setdiff(cols, names(te))] <- 0
+  wr[,setdiff(cols, names(wr))] <- 0
+  
+  # combine data.frames by row, using consistent column order
+  x <- rbind(k[,cols], qb[,cols], rb[,cols], te[,cols], wr[,cols])
+
+  ## calculate points
+  x[,'p_fg'] <- x[,'fg']*points['fg']
+  x[,'p_xpt'] <- x[,'xpt']*points['xpt']
+  x[,'p_pass_yds'] <- x[,'pass_yds']*points['pass_yds']
+  x[,'p_pass_tds'] <- x[,'pass_tds']*points['pass_tds']
+  x[,'p_pass_ints'] <- x[,'pass_ints']*points['pass_ints']
+  x[,'p_rush_yds'] <- x[,'rush_yds']*points['rush_yds']
+  x[,'p_rush_tds'] <- x[,'rush_tds']*points['rush_tds']
+  x[,'p_fumbles'] <- x[,'fumbles']*points['fumbles']
+  x[,'p_rec_yds'] <- x[,'rec_yds']*points['rec_yds']
+  x[,'p_rec_tds'] <- x[,'rec_tds']*points['rec_tds']
+  
+  x[,'points'] <- rowSums(x[,grep("^p_", names(x))])
+  
+  x2 <- x[order(x[,'points'], decreasing=TRUE),]
+  
+  # determine the row indices for each position
+  k.ix <- which(x2[,'pos']=='k')
+  qb.ix <- which(x2[,'pos']=='qb')
+  rb.ix <- which(x2[,'pos']=='rb')
+  te.ix <- which(x2[,'pos']=='te')
+  wr.ix <- which(x2[,'pos']=='wr')
+  
+  # calculate marginal points by subtracting "baseline" player's points
+  if (posReq['k'] != 0) {
+    x2[k.ix, 'marg'] <- x2[k.ix,'points'] - x2[k.ix[nTeams*posReq['k']],'points']
+  }
+  if (posReq['qb'] != 0) {
+    x2[qb.ix, 'marg'] <- x2[qb.ix,'points'] - x2[qb.ix[nTeams*posReq['qb']],'points']
+  }
+  if (posReq['rb'] != 0) {
+    x2[rb.ix, 'marg'] <- x2[rb.ix,'points'] - x2[rb.ix[nTeams*posReq['rb']],'points']
+  }
+  if (posReq['te'] != 0) {
+    x2[te.ix, 'marg'] <- x2[te.ix,'points'] - x2[te.ix[nTeams*posReq['te']],'points']
+  }
+  if (posReq['wr'] != 0) {
+  x2[wr.ix, 'marg'] <- x2[wr.ix,'points'] - x2[wr.ix[nTeams*posReq['wr']],'points']
+  }
+  
+  # create a new data.frame subset by non-negative marginal points
+  x2 = na.omit(x2)
+  x3 <- x2[x2[,'marg'] >= 0,]
+  
+  # re-order by marginal points
+  x3 <- x3[order(x3[,'marg'], decreasing=TRUE),]
+  
+  # reset the row names
+  rownames(x3) <- NULL
+  
+  # calculation for player value
+  x3[,'value'] <- (nTeams*cap-nrow(x3)) * x3[,'marg'] / sum(x3[,'marg']) + 1
+  
+  ## save dollar values as CSV file
+  dollar_values <- x3[c('PlayerName','pos','points','value')]
+  write.table(dollar_values, file = "dollar_values.csv", sep = ",", col.names = NA)
+  
+  ## return data.frame with dollar values
+  return(dollar_values)
+}
+```
+
+    1. Call `x1 <- ffvalues('.')`
+
+x1 <- ffvalues('.')
+
+    1.  How many players are worth more than $20? (1 point)
+
+print(length(which(x1$value > 20)))
+
+    1.  Who is 15th most valuable running back (rb)? (1 point)
+
+rbs <- x1[x1$pos == 'rb', ]
+rbs <- rbs[order(rbs[,'points'], decreasing=TRUE),]
+print(rbs[15,]['PlayerName'])
+
+1. Call `x2 <- ffvalues(getwd(), '16team.csv', nTeams=16, cap=150)`
+
+x2 <- ffvalues(getwd(), '16team.csv', nTeams=16, cap=150)
+
+    1.  How many players are worth more than $20? (1 point)
+
+print(length(which(x2$value > 20)))    
+    
+    1.  How many wide receivers (wr) are in the top 40? (1 point)
+
+print(length(which(x2[1:40,]$pos=='wr')))
+
+1. Call:
+
+    ```{r eval=FALSE}
+    x3 <- ffvalues('.', 'qbheavy.csv', posReq=c(qb=2, rb=2, wr=3, te=1, k=0),
+            points=c(fg=0, xpt=0, pass_yds=1/25, pass_tds=6, pass_ints=-2,
+                    rush_yds=1/10, rush_tds=6, fumbles=-2, rec_yds=1/20, rec_tds=6))
+    ```
+
+    1.  How many players are worth more than $20? (1 point)
+
+print(length(which(x3$value > 20))) 
+    
+    1.  How many quarterbacks (qb) are in the top 30? (1 point)
+
+print(length(which(x3[1:40,]$pos=='qb')))
+
+### Question 2 ###
+
+**24 points**
+
+Import the HAART dataset (`haart.csv`) from the GitHub repository into R, and perform the following manipulations: (4 points each)
+
+1. Convert date columns into a usable (for analysis) format.  Use the `table` command to display the counts of the year from `init.date`.
+2. Create an indicator variable (one which takes the values 0 or 1 only) to represent death within 1 year of the initial visit.  How many observations died in year 1?
+3. Use the `init.date`, `last.visit` and `death.date` columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). If these times are longer than 1 year, censor them (this means if the value is above 365, set followup to 365).  Print the quantile for this new variable.
+4. Create another indicator variable representing loss to followup; this means the observation is not known to be dead but does not have any followup visits after the first year.  How many records are lost-to-followup?
+5. Recall our work in class, which separated the `init.reg` field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns.  Which drug regimen are found over 100 times?
+6. The dataset `haart2.csv` contains a few additional observations for the same study. Import these and append them to your master dataset (if you were smart about how you coded the previous steps, cleaning the additional observations should be easy!).  Show the first five records and the last five records of the complete (and clean) data set.
