@@ -28,6 +28,8 @@ Note that the returned data.frame should have `sum(posReq)*nTeams` rows.
 
 Define the function as such (10 points):
 
+
+
 ```{r eval=FALSE}
 # path: directory path to input files
 path <- '~/R_projects/statistical_computing'
@@ -185,9 +187,79 @@ print(length(which(x3[1:40,]$pos=='qb')))
 
 Import the HAART dataset (`haart.csv`) from the GitHub repository into R, and perform the following manipulations: (4 points each)
 
+```{r}
+haart_df <- read.csv('/Users/jonathanlifferth/R_projects/Bios6301/datasets/haart.csv')
+```
+
+
 1. Convert date columns into a usable (for analysis) format.  Use the `table` command to display the counts of the year from `init.date`.
+
+```{r}
+names(haart_df)
+haart_df$init.date <- as.POSIXct(haart_df$init.date, format = "%m/%d/%y")
+haart_df$last.visit <- as.POSIXct(haart_df$last.visit, format = "%m/%d/%y")
+haart_df$date.death <- as.POSIXct(haart_df$date.death, format = "%m/%d/%y")
+
+library(lubridate)
+
+haart_df$init.year <- year(haart_df$init.date)
+print(table(haart_df$init.year))
+```
+
+
 2. Create an indicator variable (one which takes the values 0 or 1 only) to represent death within 1 year of the initial visit.  How many observations died in year 1?
+
+```{r}
+one_year_survival <- list()
+
+for (i in 1:nrow(haart_df)) {
+  if (haart_df[i,"death"] == 1) {
+    if (difftime(haart_df[i,"date.death"], haart_df[i,"init.date"], units = "days")[[1]] < 365) {
+#      print(1)
+      one_year_survival <- append(one_year_survival, c(1))
+    } else {
+#      print(0)
+      one_year_survival <- append(one_year_survival, c(0))
+    }
+  } else {
+#    print(0)
+    one_year_survival <- append(one_year_survival, c(0))
+  }
+  
+}
+haart_df$one_year_survival <- unlist(one_year_survival)
+
+table(haart_df$one_year_survival)
+```
+# 92 died within 1 year of initial visit
+
+
 3. Use the `init.date`, `last.visit` and `death.date` columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). If these times are longer than 1 year, censor them (this means if the value is above 365, set followup to 365).  Print the quantile for this new variable.
+```{r}
+follow_up_days <- list()
+for (i in 1:nrow(haart_df)) {
+  print(i)
+  init <- haart_df[i,'init.date']
+  last <- haart_df[i,"last.visit"]
+  death <- haart_df[i,"death.date"]
+  
+#  follow_up <- abs(difftime(haart_df[i,'init.date'], 
+#                        min(c(haart_df[i,"last.visit"], 
+#                              haart_df[i,"death.date"]))[[1]]))
+  follow_up <-abs(difftime(haart_df[i,'init.date'], min(c(haart_df[i,"last.visit"], haart_df[i,"death.date"])))[[1]])
+  if (follow_up > 365) {
+    follow_up <- 365
+  }
+  print(follow_up)
+
+}
+```
+
 4. Create another indicator variable representing loss to followup; this means the observation is not known to be dead but does not have any followup visits after the first year.  How many records are lost-to-followup?
+```{r}
+lost_to_followup <- list()
+
+```
+
 5. Recall our work in class, which separated the `init.reg` field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns.  Which drug regimen are found over 100 times?
 6. The dataset `haart2.csv` contains a few additional observations for the same study. Import these and append them to your master dataset (if you were smart about how you coded the previous steps, cleaning the additional observations should be easy!).  Show the first five records and the last five records of the complete (and clean) data set.
