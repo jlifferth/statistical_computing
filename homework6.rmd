@@ -237,8 +237,9 @@ table(haart_df$one_year_survival)
 3. Use the `init.date`, `last.visit` and `death.date` columns to calculate a followup time (in days), which is the difference between the first and either the last visit or a death event (whichever comes first). If these times are longer than 1 year, censor them (this means if the value is above 365, set followup to 365).  Print the quantile for this new variable.
 ```{r}
 follow_up_days <- list()
+haart_df$follow_up_days <- 365
 for (i in 1:nrow(haart_df)) {
-  print(i)
+#  print(i)
   init <- haart_df[i,'init.date']
   last <- haart_df[i,"last.visit"]
   death <- haart_df[i,"death.date"]
@@ -246,20 +247,145 @@ for (i in 1:nrow(haart_df)) {
 #  follow_up <- abs(difftime(haart_df[i,'init.date'], 
 #                        min(c(haart_df[i,"last.visit"], 
 #                              haart_df[i,"death.date"]))[[1]]))
-  follow_up <-abs(difftime(haart_df[i,'init.date'], min(c(haart_df[i,"last.visit"], haart_df[i,"death.date"])))[[1]])
+  follow_up <-abs(difftime(haart_df[i,'init.date'], 
+                           min(c(haart_df[i,"last.visit"], haart_df[i,"death.date"]), na.rm = TRUE))[[1]])
   if (follow_up > 365) {
     follow_up <- 365
   }
-  print(follow_up)
-
+#  print(follow_up)
+#  follow_up_days <- append(follow_up_days,c(follow_up))
+  haart_df$follow_up_days[i] <- follow_up
 }
+
+quantile(haart_df$follow_up_days)
 ```
 
 4. Create another indicator variable representing loss to followup; this means the observation is not known to be dead but does not have any followup visits after the first year.  How many records are lost-to-followup?
 ```{r}
-lost_to_followup <- list()
+haart_df$lost_to_followup <- 0
+for (i in 1:nrow(haart_df)) {
+  if (haart_df$death[i] != 1) {
+    follow_up_delta <- abs(difftime(haart_df$init.date[i], haart_df$last.visit[i])[[1]])
+    if (follow_up_delta > 365) {
+      haart_df$lost_to_followup[i] <- 1
+    }
+  }
+}
+table(haart_df$lost_to_followup)
+```
+# 710 records are lost to follow-up
+
+5. Recall our work in class, which separated the `init.reg` field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns.  Which drug regimen are found over 100 times?
+```{r}
+init.reg <- as.character(haart_df[,'init.reg'])
+haart_df[['init.reg_list']] <- strsplit(init.reg, ",")
+(all_drugs <- unique(unlist(haart_df$init.reg_list)))
+reg_drugs <- matrix(FALSE, nrow=nrow(haart_df), ncol=length(all_drugs))
+for(i in seq_along(all_drugs)) {
+  reg_drugs[,i] <- sapply(haart_df$init.reg_list, function(x) all_drugs[i] %in% x)
+}
+reg_drugs <- data.frame(reg_drugs)
+names(reg_drugs) <- all_drugs
+head(reg_drugs)
+haart_merged <- cbind(haart_df, reg_drugs)
+head(haart_merged)
+
+for (drug in all_drugs) {
+  if (table(haart_merged[,drug])[2] >= 100) {
+    print(drug)
+    print(table(haart_merged[,drug])[2])
+  }
+}
 
 ```
 
-5. Recall our work in class, which separated the `init.reg` field into a set of indicator variables, one for each unique drug. Create these fields and append them to the database as new columns.  Which drug regimen are found over 100 times?
 6. The dataset `haart2.csv` contains a few additional observations for the same study. Import these and append them to your master dataset (if you were smart about how you coded the previous steps, cleaning the additional observations should be easy!).  Show the first five records and the last five records of the complete (and clean) data set.
+```{r}
+haart2 <- read.csv('/Users/jonathanlifferth/R_projects/Bios6301/datasets/haart2.csv')
+
+haart2$init.date <- as.POSIXct(haart2$init.date, format = "%m/%d/%y")
+haart2$last.visit <- as.POSIXct(haart2$last.visit, format = "%m/%d/%y")
+haart2$date.death <- as.POSIXct(haart2$date.death, format = "%m/%d/%y")
+
+one_year_survival <- list()
+
+for (i in 1:nrow(haart2)) {
+  if (haart2[i,"death"] == 1) {
+    if (difftime(haart2[i,"date.death"], haart2[i,"init.date"], units = "days")[[1]] < 365) {
+#      print(1)
+      one_year_survival <- append(one_year_survival, c(1))
+    } else {
+#      print(0)
+      one_year_survival <- append(one_year_survival, c(0))
+    }
+  } else {
+#    print(0)
+    one_year_survival <- append(one_year_survival, c(0))
+  }
+  
+}
+haart2$one_year_survival <- unlist(one_year_survival)
+
+
+follow_up_days <- list()
+haart2$follow_up_days <- 365
+for (i in 1:nrow(haart2)) {
+#  print(i)
+  init <- haart2[i,'init.date']
+  last <- haart2[i,"last.visit"]
+  death <- haart2[i,"death.date"]
+  
+#  follow_up <- abs(difftime(haart_df[i,'init.date'], 
+#                        min(c(haart_df[i,"last.visit"], 
+#                              haart_df[i,"death.date"]))[[1]]))
+  follow_up <-abs(difftime(haart2[i,'init.date'], 
+                           min(c(haart2[i,"last.visit"], haart2[i,"death.date"]), na.rm = TRUE))[[1]])
+  if (follow_up > 365) {
+    follow_up <- 365
+  }
+#  print(follow_up)
+#  follow_up_days <- append(follow_up_days,c(follow_up))
+  haart2$follow_up_days[i] <- follow_up
+}
+
+haart2$lost_to_followup <- 0
+for (i in 1:nrow(haart2)) {
+  if (haart2$death[i] != 1) {
+    follow_up_delta <- abs(difftime(haart2$init.date[i], haart2$last.visit[i])[[1]])
+    if (follow_up_delta > 365) {
+      haart2$lost_to_followup[i] <- 1
+    }
+  }
+}
+
+init.reg <- as.character(haart2[,'init.reg'])
+haart2[['init.reg_list']] <- strsplit(init.reg, ",")
+(all_drugs2 <- unique(unlist(haart2$init.reg_list)))
+reg_drugs2 <- matrix(FALSE, nrow=nrow(haart2), ncol=length(all_drugs2))
+for(i in seq_along(all_drugs2)) {
+  print(i)
+  reg_drugs2[,i] <- sapply(haart2$init.reg_list, function(x) all_drugs2[i] %in% x)
+}
+reg_drugs2 <- data.frame(reg_drugs2)
+names(reg_drugs2) <- all_drugs2
+head(reg_drugs2)
+haart2_merged <- cbind(haart2, reg_drugs2)
+head(haart2_merged)
+
+# need to add columns for reg drugs in the previous dataset but not the new dataset
+missing_drugs <- setdiff(all_drugs, all_drugs2)
+missing_drugs
+
+for (drug in missing_drugs) {
+  haart2_merged[,drug] <- FALSE
+}
+haart2_merged
+
+haart1_2_merged <- cbind(haart_df, haart2)
+head(haart1_2_merged, 5)
+```
+
+```{r}
+tail(haart1_2_merged, 5)
+```
+
