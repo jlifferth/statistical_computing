@@ -65,25 +65,26 @@ rownames(x) <- NULL
 gap_years <- data.frame()
 
 nrow(x)
-for (i in 1:nrow(x)-1) {
+for (i in 1:(nrow(x)-1)) {
   current_id <- x[i,'id']
   next_id <- x[i+1,'id']
-
-  # only proceed if we're evaluating the same id
-  if (next_id == current_id) {
-      # what is the time gap between the current row and the next row?
-      delta <- abs(difftime(x[i+1,'dt'], x[i,'dt'], units = 'days')[[1]])
-      num_years <- trunc(delta / 365)
-    
-      # add new rows for each observation year gap
-      if (num_years > 0) {
-        for (j in 1:num_years) {
-          new_row <- data.frame(id = current_id, dt = x[i,'dt']+years(j), a1c=NA)
-  #        x <- rbind(x[1:i,], new_row, x[i+1:nrow(x),])
-          gap_years <- rbind(gap_years, new_row)
+  
+    # only proceed if we're evaluating the same id
+    if (next_id == current_id) {
+        # what is the time gap between the current row and the next row?
+        delta <- abs(difftime(x[i+1,'dt'], x[i,'dt'], units = 'days')[[1]])
+        num_years <- trunc(delta / 365)
+      
+        # add new rows for each observation year gap
+        if (num_years > 0) {
+          for (j in 1:num_years) {
+            new_row <- data.frame(id = current_id, dt = x[i,'dt']+years(j), a1c=NA)
+    #        x <- rbind(x[1:i,], new_row, x[i+1:nrow(x),])
+            gap_years <- rbind(gap_years, new_row)
+        }
       }
     }
-  }
+
 }
 
 ```
@@ -160,7 +161,8 @@ subset(x2, id==15)
 Install the `lexicon` package. Load the `sw_fry_1000` vector, which contains 1,000 common words.
 
 ```{r}
-install.packages('lexicon')
+#install.packages('lexicon')
+library('lexicon')
 ```
 
 ```{r}
@@ -293,7 +295,7 @@ tryCatch(myfun(haart_df, death), error = function(e) e)
 
 What do you think is going on?  Consider using `debug` to trace the problem.
 ```{r}
-debug(myfun(dat=haart_df, response=death))
+# debug(myfun(dat=haart_df, response=death))
 ```
 Debugging revealed the following error: 
 "Error in eval(predvars, data, env) : object 'death' not found"
@@ -306,10 +308,11 @@ Create a working function.
 # eval() can't find death in the current scope/environment
 
 ```{r}
+
 myfun2 <- function(dat, response) {
-  form <- as.formula(as.character(response) ~ .)
+  form <- paste0(substitute(response), " ~.")
   coef(summary(glm(form, data=dat, family=binomial(logit))))
 }
-myfun2(dat=haart_df, response="death")
+myfun2(dat=haart_df, response=death)
 ```
 
