@@ -1,0 +1,146 @@
+---
+author: 'Jonathan Lifferth'
+title: 'Bios 6301: Assignment 9'
+output: pdf_document
+---
+
+*Due Tuesday, 28 November, 1:00 PM*
+
+$5^{n=day}$ points taken off for each day late.
+
+40 points total.
+
+Submit a single knitr file (named `homework9.rmd`), along with a valid PDF output file. Inside the file, clearly indicate which parts of your responses go with which problems (you may use the original homework document as a template). Add your name as `author` to the file's metadata section. Raw R code/output or word processor files are not acceptable.
+
+Failure to name file `homework9.rmd` or include author name may result in 5 points taken off.
+
+### Question 1 ###
+
+**15 points**
+
+Consider the following very simple genetic model (*very* simple -- don't worry if you're not a geneticist!). A population consists of equal numbers of two sexes: male and female. At each generation men and women are paired at random, and each pair produces exactly two offspring, one male and one female. We are interested in the distribution of height from one generation to the next. Suppose that the height of both children is just the average of the height of their parents, how will the distribution of height change across generations?
+
+Represent the heights of the current generation as a dataframe with two variables, m and f, for the two sexes. We can use `rnorm` to randomly generate the population at generation 1:
+
+```{r}
+pop <- data.frame(m = rnorm(100, 160, 20), f = rnorm(100, 160, 20))
+```
+
+The following function takes the data frame `pop` and randomly permutes the ordering of the men. Men and women are then paired according to rows, and heights for the next generation are calculated by taking the mean of each row. The function returns a data frame with the same structure, giving the heights of the next generation.
+
+```{r}
+next_gen <- function(pop) {
+    pop$m <- sample(pop$m)
+    pop$m <- rowMeans(pop)
+    pop$f <- pop$m
+    pop
+}
+```
+
+Use the function `next_gen` to generate nine generations (you already have the first), then use the function `hist` to plot the distribution of male heights in each generation (this will require multiple calls to `hist`). The phenomenon you see is called regression to the mean.  Provide (at least) minimal decorations such as title and x-axis labels.
+
+```{r}
+hist(pop$m, main = "Gen 1 Male Height", xlab = "Height")
+```
+```{r}
+gen2 <- next_gen(pop)
+hist(gen2$m, main = "Gen 2 Male Height", xlab = "Height")
+```
+```{r}
+gen3 <- next_gen(gen2)
+hist(gen3$m, main = "Gen 3 Male Height", xlab = "Height")
+```
+```{r}
+gen4 <- next_gen(gen2)
+hist(gen3$m, main = "Gen 3 Male Height", xlab = "Height")
+```
+```{r}
+gen5 <- next_gen(gen4)
+hist(gen5$m, main = "Gen 5 Male Height", xlab = "Height")
+```
+```{r}
+gen6 <- next_gen(gen5)
+hist(gen6$m, main = "Gen 6 Male Height", xlab = "Height")
+```
+```{r}
+gen7 <- next_gen(gen6)
+hist(gen7$m, main = "Gen 7 Male Height", xlab = "Height")
+```
+```{r}
+gen8 <- next_gen(gen7)
+hist(gen8$m, main = "Gen 8 Male Height", xlab = "Height")
+```
+```{r}
+gen9 <- next_gen(gen8)
+hist(gen9$m, main = "Gen 9 Male Height", xlab = "Height")
+```
+
+### Question 2 ###
+
+**10 points**
+
+Use the simulated results from question 1 to reproduce (as closely as possible) the following plot in ggplot2.
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+p1 <- ggplot(pop, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p2 <- ggplot(gen2, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p3 <- ggplot(gen3, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p4 <- ggplot(gen4, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p5 <- ggplot(gen5, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p6 <- ggplot(gen6, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p7 <- ggplot(gen7, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p8 <- ggplot(gen8, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+p9 <- ggplot(gen9, aes(x=m, y=f)) + geom_point(alpha = 1/5) + xlim(100, 225) + ylim(90, 210)
+
+```
+
+```{r}
+grid.arrange(p1, p2, p3, p4, p5, p6, p7, p8, p9, nrow = 3)
+
+```
+
+
+
+### Question 3 ###
+
+**15 points**
+
+You calculated the power of a study design in question #1 of assignment 3. The study has two variables, treatment group and outcome. There are two treatment groups (0, 1) and they should be assigned randomly with equal probability. The outcome should be a random normal variable with a mean of 60 and standard deviation of 20. If a patient is in the treatment group, add 5 to the outcome.
+
+Starting with a sample size of 250, create a 95% bootstrap percentile interval for the mean of each group. Then create a new bootstrap interval by increasing the sample size by 250 until the sample is 2500. Thus you will create a total of 10 bootstrap intervals.  Each bootstrap should create 1000 bootstrap samples. (9 points)
+
+Produce a line chart that includes the bootstrapped mean and lower and upper percentile intervals for each group.  Add appropriate labels and a legend. (6 points)
+
+You may use base graphics or ggplot2.  It should look similar to this (in base).
+
+![bp interval plot](bpi.jpg)
+
+Here's an example of how you could create transparent shaded areas.
+
+```{r}
+makeTransparent = function(..., alpha=0.5) {
+  if(alpha<0 | alpha>1) stop("alpha must be between 0 and 1")
+  alpha = floor(255*alpha)  
+  newColor = col2rgb(col=unlist(list(...)), alpha=FALSE)
+  .makeTransparent = function(col, alpha) {
+    rgb(red=col[1], green=col[2], blue=col[3], alpha=alpha, maxColorValue=255)
+  }
+  newColor = apply(newColor, 2, .makeTransparent, alpha=alpha)
+  return(newColor)
+}
+
+par(new=FALSE)
+plot(NULL,
+  xlim=c(-1, 1),
+  ylim=c(-1, 1),
+  xlab="",
+  ylab=""
+)
+
+polygon(x=c(seq(-0.75, 0.25, length.out=100), seq(0.25, -0.75, length.out=100)),
+        y=c(rep(-0.25, 100), rep(0.75, 100)), border=NA, col=makeTransparent('blue',alpha=0.5))
+polygon(x=c(seq(-0.25, 0.75, length.out=100), seq(0.75, -0.25, length.out=100)),
+        y=c(rep(-0.75, 100), rep(0.25, 100)), border=NA, col=makeTransparent('red',alpha=0.5))
+```
