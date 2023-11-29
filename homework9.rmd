@@ -119,29 +119,33 @@ num_bootstrap_samples <- 1000
 quantiles_0 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
 quantiles_1 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
 
+# create each interval population
 for(i in 1:num_bootstrap_intervals) {
   print(i)
   sample_size <- first_sample_size * i
   
   quant0_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
   quant1_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+  
+  grp <- sample(0:1, sample_size, replace=TRUE)
+  values <- rnorm(sample_size, 60, 20)
+  values[grp == 1] <- values[grp == 1] + 5 
+  interval_population <- data.frame(treatment=grp, value=values)
 
-  # perform bootstrap
+  # perform bootstrap, sample from current interval population
   for(j in 1:num_bootstrap_samples) {
-    df0 <- data.frame(value = rnorm(sample_size, mean = 60, sd = 20), treatment = rep(0, sample_size))
-    df1 <- data.frame(value = rnorm(sample_size, mean = 60, sd = 20) + 5, treatment = rep(1, sample_size))
-    df_combined <- rbind(df0, df1)
+    bootstrap_sample <- interval_population[sample(nrow(interval_population), 250, replace=TRUE), ]
     
     # group 0 stats
-    mean0 <- mean(subset(df_combined, treatment == 0)$value)
-    quant0 <- quantile(subset(df_combined, treatment == 0)$value, c(.025, .975))
+    mean0 <- mean(subset(bootstrap_sample, treatment == 0)$value)
+    quant0 <- quantile(subset(bootstrap_sample, treatment == 0)$value, c(.025, .975))
     lower0 <- as.double(quant0[1])
     upper0 <- as.double(quant0[2])
     quant0_bootstraps[j,] <- data.frame(mean=mean0, upper=upper0, lower=lower0)
     
     # group 1 stats
-    mean1 <- mean(subset(df_combined, treatment == 1)$value)
-    quant1 <- quantile(subset(df_combined, treatment == 1)$value, c(.025, .975))
+    mean1 <- mean(subset(bootstrap_sample, treatment == 1)$value)
+    quant1 <- quantile(subset(bootstrap_sample, treatment == 1)$value, c(.025, .975))
     lower1 <- as.double(quant1[1])
     upper1 <- as.double(quant1[2])
     quant1_bootstraps[j,] <- data.frame(mean=mean1, upper=upper1, lower=lower1)
@@ -159,43 +163,16 @@ for(i in 1:num_bootstrap_intervals) {
 
 ```
 
-
 Produce a line chart that includes the bootstrapped mean and lower and upper percentile intervals for each group.  Add appropriate labels and a legend. (6 points)
 
 You may use base graphics or ggplot2.  It should look similar to this (in base).
 
 ![bp interval plot](bpi.jpg)
 
-Here's an example of how you could create transparent shaded areas.
-
-```{r}
-makeTransparent = function(..., alpha=0.5) {
-  if(alpha<0 | alpha>1) stop("alpha must be between 0 and 1")
-  alpha = floor(255*alpha)  
-  newColor = col2rgb(col=unlist(list(...)), alpha=FALSE)
-  .makeTransparent = function(col, alpha) {
-    rgb(red=col[1], green=col[2], blue=col[3], alpha=alpha, maxColorValue=255)
-  }
-  newColor = apply(newColor, 2, .makeTransparent, alpha=alpha)
-  return(newColor)
-}
-
-par(new=FALSE)
-plot(NULL,
-  xlim=c(-1, 1),
-  ylim=c(-1, 1),
-  xlab="",
-  ylab=""
-)
-polygon(x=c(seq(-0.75, 0.25, length.out=100), seq(0.25, -0.75, length.out=100)),
-        y=c(rep(-0.25, 100), rep(0.75, 100)), border=NA, col=makeTransparent('blue',alpha=0.5))
-polygon(x=c(seq(-0.25, 0.75, length.out=100), seq(0.75, -0.25, length.out=100)),
-        y=c(rep(-0.75, 100), rep(0.25, 100)), border=NA, col=makeTransparent('red',alpha=0.5))
-```
-
 ```{r}
 library(ggplot2)
-
+```
+```{r}
 groups <- c("Group 0", "Group 1")
 colors <- c("Group 1" = "blue", "Group 0" = "red")
 
@@ -208,7 +185,7 @@ ggplot() + geom_line(aes(x=1:length(quantiles_0$mean),y=quantiles_0$mean, color=
   scale_color_manual(values = colors) +
   geom_ribbon(aes(x= 1:length(quantiles_0$mean), ymin=quantiles_0$lower, ymax=quantiles_0$upper), linetype=2, alpha=0.3, fill="red") +
   geom_ribbon(aes(x= 1:length(quantiles_1$mean), ymin=quantiles_1$lower, ymax=quantiles_1$upper), linetype=2, alpha=0.3, fill="blue") + 
-  ggtitle("Bootstrap intervals by treatment group") +
+  ggtitle("Bootstrap interval by treatment group") +
   geom_line() + 
   labs()
 
