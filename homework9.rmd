@@ -111,6 +111,55 @@ You calculated the power of a study design in question #1 of assignment 3. The s
 
 Starting with a sample size of 250, create a 95% bootstrap percentile interval for the mean of each group. Then create a new bootstrap interval by increasing the sample size by 250 until the sample is 2500. Thus you will create a total of 10 bootstrap intervals.  Each bootstrap should create 1000 bootstrap samples. (9 points)
 
+```{r}
+first_sample_size <- 250
+num_bootstrap_intervals <- 10
+num_bootstrap_samples <- 1000
+
+quantiles_0 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+quantiles_1 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+
+for(i in 1:num_bootstrap_intervals) {
+  print(i)
+  sample_size <- first_sample_size * i
+  
+  quant0_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+  quant1_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+
+  # perform bootstrap
+  for(j in 1:num_bootstrap_samples) {
+    df0 <- data.frame(value = rnorm(sample_size, mean = 60, sd = 20), treatment = rep(0, sample_size))
+    df1 <- data.frame(value = rnorm(sample_size, mean = 60, sd = 20) + 5, treatment = rep(1, sample_size))
+    df_combined <- rbind(df0, df1)
+    
+    # group 0 stats
+    mean0 <- mean(subset(df_combined, treatment == 0)$value)
+    quant0 <- quantile(subset(df_combined, treatment == 0)$value, c(.025, .975))
+    lower0 <- as.double(quant0[1])
+    upper0 <- as.double(quant0[2])
+    quant0_bootstraps[j,] <- data.frame(mean=mean0, upper=upper0, lower=lower0)
+    
+    # group 1 stats
+    mean1 <- mean(subset(df_combined, treatment == 1)$value)
+    quant1 <- quantile(subset(df_combined, treatment == 1)$value, c(.025, .975))
+    lower1 <- as.double(quant1[1])
+    upper1 <- as.double(quant1[2])
+    quant1_bootstraps[j,] <- data.frame(mean=mean1, upper=upper1, lower=lower1)
+  }
+  
+  # after performing bootstraps, add means to quantile dfs
+  quantiles_0[i,] <- data.frame(mean=mean(quant0_bootstraps$mean), 
+                                upper=mean(quant0_bootstraps$upper),
+                                lower=mean(quant0_bootstraps$lower))
+  quantiles_1[i,] <- data.frame(mean=mean(quant1_bootstraps$mean), 
+                                upper=mean(quant1_bootstraps$upper),
+                                lower=mean(quant1_bootstraps$lower))
+}
+
+
+```
+
+
 Produce a line chart that includes the bootstrapped mean and lower and upper percentile intervals for each group.  Add appropriate labels and a legend. (6 points)
 
 You may use base graphics or ggplot2.  It should look similar to this (in base).
@@ -138,9 +187,30 @@ plot(NULL,
   xlab="",
   ylab=""
 )
-
 polygon(x=c(seq(-0.75, 0.25, length.out=100), seq(0.25, -0.75, length.out=100)),
         y=c(rep(-0.25, 100), rep(0.75, 100)), border=NA, col=makeTransparent('blue',alpha=0.5))
 polygon(x=c(seq(-0.25, 0.75, length.out=100), seq(0.75, -0.25, length.out=100)),
         y=c(rep(-0.75, 100), rep(0.25, 100)), border=NA, col=makeTransparent('red',alpha=0.5))
 ```
+
+```{r}
+library(ggplot2)
+
+groups <- c("Group 0", "Group 1")
+colors <- c("Group 1" = "blue", "Group 0" = "red")
+
+ggplot() + geom_line(aes(x=1:length(quantiles_0$mean),y=quantiles_0$mean, color='Group 1')) + geom_line(aes(x=1:length(quantiles_1$mean),y=quantiles_1$mean, color='Group 0')) + 
+  ylab('Value') + 
+  xlab('Interval') +
+  labs(x = "Interval",
+       y = "Value",
+       color = "Treatment") +
+  scale_color_manual(values = colors) +
+  geom_ribbon(aes(x= 1:length(quantiles_0$mean), ymin=quantiles_0$lower, ymax=quantiles_0$upper), linetype=2, alpha=0.3, fill="red") +
+  geom_ribbon(aes(x= 1:length(quantiles_1$mean), ymin=quantiles_1$lower, ymax=quantiles_1$upper), linetype=2, alpha=0.3, fill="blue") + 
+  ggtitle("Bootstrap intervals by treatment group") +
+  geom_line() + 
+  labs()
+
+```
+
