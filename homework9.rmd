@@ -116,48 +116,53 @@ first_sample_size <- 250
 num_bootstrap_intervals <- 10
 num_bootstrap_samples <- 1000
 
-quantiles_0 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
-quantiles_1 <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+quantiles_0 <- data.frame(matrix(ncol=4,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower", "size"))))
+quantiles_1 <- data.frame(matrix(ncol=4,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower", "size"))))
 
 # create each interval population
 for(i in 1:num_bootstrap_intervals) {
   print(i)
   sample_size <- first_sample_size * i
   
-  quant0_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
-  quant1_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+#  quant0_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
+#  quant1_bootstraps <- data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("mean", "upper", "lower"))))
   
   grp <- sample(0:1, sample_size, replace=TRUE)
   values <- rnorm(sample_size, 60, 20)
   values[grp == 1] <- values[grp == 1] + 5 
   interval_population <- data.frame(treatment=grp, value=values)
+  
+  means_0 <- list()
+  means_1 <- list()
 
   # perform bootstrap, sample from current interval population
   for(j in 1:num_bootstrap_samples) {
-    bootstrap_sample <- interval_population[sample(nrow(interval_population), 250, replace=TRUE), ]
+    bootstrap_sample <- interval_population[sample(nrow(interval_population), sample_size, replace=TRUE), ]
     
     # group 0 stats
     mean0 <- mean(subset(bootstrap_sample, treatment == 0)$value)
-    quant0 <- quantile(subset(bootstrap_sample, treatment == 0)$value, c(.025, .975))
-    lower0 <- as.double(quant0[1])
-    upper0 <- as.double(quant0[2])
-    quant0_bootstraps[j,] <- data.frame(mean=mean0, upper=upper0, lower=lower0)
+    means_0[j] <- mean0
     
     # group 1 stats
     mean1 <- mean(subset(bootstrap_sample, treatment == 1)$value)
-    quant1 <- quantile(subset(bootstrap_sample, treatment == 1)$value, c(.025, .975))
-    lower1 <- as.double(quant1[1])
-    upper1 <- as.double(quant1[2])
-    quant1_bootstraps[j,] <- data.frame(mean=mean1, upper=upper1, lower=lower1)
+    means_1[j] <- mean1
   }
   
   # after performing bootstraps, add means to quantile dfs
-  quantiles_0[i,] <- data.frame(mean=mean(quant0_bootstraps$mean), 
-                                upper=mean(quant0_bootstraps$upper),
-                                lower=mean(quant0_bootstraps$lower))
-  quantiles_1[i,] <- data.frame(mean=mean(quant1_bootstraps$mean), 
-                                upper=mean(quant1_bootstraps$upper),
-                                lower=mean(quant1_bootstraps$lower))
+  means_0 <- unlist(means_0)
+  interval_mean_0 <- mean(means_0)
+  interval_upper_0 <- quantile(means_0, c(.025, .975))[2]
+  interval_lower_0 <- quantile(means_0, c(.025, .975))[1]
+  quantiles_0[i,] <- data.frame(mean=interval_mean_0, upper=interval_upper_0, 
+                                lower=interval_lower_0, size=sample_size)
+  
+  
+  means_1 <- unlist(means_1)
+  interval_mean_1 <- mean(means_1)
+  interval_upper_1 <- quantile(means_1, c(.025, .975))[2]
+  interval_lower_1 <- quantile(means_1, c(.025, .975))[1]
+  quantiles_1[i,] <- data.frame(mean=interval_mean_1, upper=interval_upper_1, 
+                                lower=interval_lower_1, size=sample_size)
 }
 
 
@@ -174,20 +179,19 @@ library(ggplot2)
 ```
 ```{r}
 groups <- c("Group 0", "Group 1")
-colors <- c("Group 1" = "blue", "Group 0" = "red")
+colors <- c("Group 0" = "blue", "Group 1" = "red")
 
-ggplot() + geom_line(aes(x=1:length(quantiles_0$mean),y=quantiles_0$mean, color='Group 1')) + geom_line(aes(x=1:length(quantiles_1$mean),y=quantiles_1$mean, color='Group 0')) + 
+ggplot() + 
+  geom_line(aes(x=quantiles_0$size,y=quantiles_0$mean, color='Group 0')) +
+  geom_line(aes(x=quantiles_1$size,y=quantiles_1$mean, color='Group 1')) + 
   ylab('Value') + 
   xlab('Interval') +
-  labs(x = "Interval",
-       y = "Value",
+  labs(x = "Sample Size",
+       y = "Mean Value",
        color = "Treatment") +
   scale_color_manual(values = colors) +
-  geom_ribbon(aes(x= 1:length(quantiles_0$mean), ymin=quantiles_0$lower, ymax=quantiles_0$upper), linetype=2, alpha=0.3, fill="red") +
-  geom_ribbon(aes(x= 1:length(quantiles_1$mean), ymin=quantiles_1$lower, ymax=quantiles_1$upper), linetype=2, alpha=0.3, fill="blue") + 
-  ggtitle("Bootstrap interval by treatment group") +
-  geom_line() + 
-  labs()
-
+  geom_ribbon(aes(x=quantiles_0$size, ymin=quantiles_0$lower, ymax=quantiles_0$upper), linetype=2, alpha=0.3, fill="skyblue2") +
+  geom_ribbon(aes(x=quantiles_1$size, ymin=quantiles_1$lower, ymax=quantiles_1$upper), linetype=2, alpha=0.3, fill="indianred2") + 
+  ggtitle("Bootstrap means by treatment group") +
+  geom_line()
 ```
-
