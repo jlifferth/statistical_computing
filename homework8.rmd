@@ -21,7 +21,7 @@ Failure to name file `homework8.rmd` or include author name may result in 5 poin
 Install the `readxl` package and run the following
 
 ```{r}
-install.packages('readxl')
+# install.packages('readxl')
 fn <- 'icd10.xlsx'
 if(file.access(fn, mode = 4) == -1) {
     url <- "https://www.cdc.gov/nhsn/xls/icd10-pcs-pcm-nhsn-opc.xlsx"
